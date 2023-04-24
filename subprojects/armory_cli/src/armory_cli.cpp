@@ -81,7 +81,7 @@ namespace armory_cli
                 std::cout << "  ";
                 if (i_f)
                 {
-                    print_instruction_fault(*i_f, config, disasm);
+                    print_instruction_fault(*i_f, emu, disasm);
                 }
                 else
                 {
@@ -109,7 +109,7 @@ namespace armory_cli
                 for (const auto& f : faults.instruction_faults)
                 {
                     std::cout << "  ";
-                    print_instruction_fault(f, config, disasm);
+                    print_instruction_fault(f, emu, disasm);
                 }
                 for (const auto& f : faults.register_faults)
                 {
@@ -179,59 +179,12 @@ namespace armory_cli
         }
 
         Configuration config;
-        config.start_address                      = -1;
-        config.flash                              = {0, 0};
-        config.ram                                = {0, 0};
-        config.arch                               = Architecture::ARMv7M;
         config.faulting_context.emulation_timeout = 0;
         config.num_threads                        = 0;
 
         for (u32 i = 0; i < args.size(); ++i)
         {
-            if (args[i] == "--start")
-            {
-                config.start_address = to_int(args[++i]);
-            }
-            else if (args[i] == "--halt")
-            {
-                auto symbol               = args[++i];
-                auto addr                 = to_int(args[++i]);
-                config.symbol_names[addr] = symbol;
-                config.halt_addresses.push_back(addr);
-                config.faulting_context.halting_points.push_back(addr);
-            }
-            else if (args[i] == "--symbol")
-            {
-                auto symbol               = args[++i];
-                auto addr                 = to_int(args[++i]);
-                config.symbol_names[addr] = symbol;
-                config.symbol_addresses.push_back(addr);
-            }
-            else if (args[i] == "--section")
-            {
-                config.binary.push_back({args[++i], read_file(args[i]), (u32)to_int(args[++i])});
-            }
-            else if (args[i] == "--flash")
-            {
-                config.flash.offset = to_int(args[++i]);
-                config.flash.size   = to_int(args[++i]);
-            }
-            else if (args[i] == "--ram")
-            {
-                config.ram.offset = to_int(args[++i]);
-                config.ram.size   = to_int(args[++i]);
-            }
-            else if (args[i] == "--ignore")
-            {
-                auto begin = to_int(args[++i]);
-                auto end   = to_int(args[++i]);
-                config.faulting_context.ignore_memory_ranges.emplace_back(MemoryRange({begin, end - begin}));
-            }
-            else if (args[i] == "--timeout")
-            {
-                config.faulting_context.emulation_timeout = to_int(args[++i]);
-            }
-            else if (args[i] == "--armv7m")
+            if (args[i] == "--armv7m")
             {
                 config.arch = Architecture::ARMv7M;
             }
@@ -243,23 +196,6 @@ namespace armory_cli
             {
                 throw std::runtime_error("unkown option '" + args[i] + "'");
             }
-        }
-
-        if (config.start_address == (u32)-1)
-        {
-            throw std::runtime_error("no entry point given");
-        }
-        if (config.faulting_context.halting_points.size() == 0)
-        {
-            throw std::runtime_error("no end address given");
-        }
-        if (config.ram.size == 0)
-        {
-            throw std::runtime_error("no RAM given");
-        }
-        if (config.flash.size == 0)
-        {
-            throw std::runtime_error("no FLASH given");
         }
 
         return config;

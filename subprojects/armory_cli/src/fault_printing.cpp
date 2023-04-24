@@ -31,25 +31,10 @@ namespace armory_cli
         }
     }
 
-    void print_instruction_fault(const armory::InstructionFault& f, const Configuration& ctx, mulator::Disassembler& disasm)
+    void print_instruction_fault(const armory::InstructionFault& f, const mulator::Emulator& emu, mulator::Disassembler& disasm)
     {
-        const CodeSection* text_segment = nullptr;
-        for (const auto& segment : ctx.binary)
-        {
-            if (segment.offset <= f.address && segment.offset + segment.bytes.size() >= f.address)
-            {
-                text_segment = &segment;
-            }
-        }
-
-        if (text_segment == nullptr)
-        {
-            std::cout << "ERROR: " << std::hex << f.address << " is not within a defined segment of the binary" << std::endl;
-            return;
-        }
-
         u8 bytes[4] = {0xFF, 0xFF, 0xFF, 0xFF};
-        std::memcpy(bytes, text_segment->bytes.data() + f.address - text_segment->offset, std::min((u32)4, (u32)text_segment->bytes.size() - (f.address - text_segment->offset)));
+        emu.read_memory(f.address, bytes, std::min((u32)4, emu.get_flash_size() + emu.get_flash_offset() - f.address));
         std::string original_code;
         std::string original_string;
 

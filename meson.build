@@ -8,6 +8,6 @@ libarmory_cli_dep = subproject('armory_cli').get_variable('libarmory_cli_dep')
 
 executable('armory_example',
     sources: files('src/main.cpp'),
-    include_directories : include_directories('include'),
+    include_directories : [include_directories('include'), include_directories('include/ELFIO')],
     dependencies: libarmory_cli_dep)
 
