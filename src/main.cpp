@@ -116,6 +116,8 @@ int main(int argc, char** argv)
             emu.read_memory(0x20008000, (uint8_t*)&test_mem, 4);
             if (test_mem == 0xcafebabe)
                 return Decision::EXPLOITABLE;
+            else if (test_mem == 0xffffffff)
+                return Decision::CONTINUE_SIMULATION;
             else
                 return Decision::NOT_EXPLOITABLE;
         };
