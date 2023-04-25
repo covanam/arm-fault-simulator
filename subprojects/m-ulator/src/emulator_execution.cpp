@@ -1087,8 +1087,15 @@ bool Emulator::execute(const Instruction& instr)
     }
     else if (instr.name == Mnemonic::UDF)
     {
-        m_return_code = ReturnCode::UNDEFINED;
-        return false;
+        {
+            /* not entirely correct behavior, but this crashes the binary which
+               is similar to what we wants */
+            branch_write_PC(0xFFFFFFFE);
+            instruction_executed = true;
+            increment_pc         = false;
+        }
+        ADVANCE_PC
+        return instruction_executed;
     }
     else if (instr.name == Mnemonic::STMDB)
     {
