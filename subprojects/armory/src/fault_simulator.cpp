@@ -333,8 +333,7 @@ void FaultSimulator::detect_end_of_execution(Emulator& emu, u32 address, u32 ins
     UNUSED(instr_size);
     auto [inst_ptr, thread_ctx] = *((std::tuple<FaultSimulator*, ThreadContext*>*)user_data);
 
-    /* every ~1000 instructions or when stopped */
-    if ((emu.is_running() && emu.get_time() % 1024 == 0) || !emu.is_running()) {
+    {
         if (thread_ctx->exploitability_model == nullptr)
         {
             thread_ctx->decision = ExploitabilityModel::Decision::EXPLOITABLE;
