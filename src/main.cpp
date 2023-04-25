@@ -11,12 +11,12 @@
 
 using namespace armory;
 
-static Emulator setup_simulator(const std::string& elf_file) {
+static Emulator setup_simulator(const std::string& elf_file, u32 *firmware_addr) {
     Emulator emu(mulator::ARMv7M);
     emu.set_flash_region(0, 0x40000);
     emu.set_ram_region(0x20000000, 0x10000);
 
-    ELFIO::Elf64_Addr entry_address;
+    ELFIO::Elf64_Addr entry_address = 0xffffffff;
 
     ELFIO::elfio reader;
 
@@ -52,11 +52,16 @@ static Emulator setup_simulator(const std::string& elf_file) {
                 
                 if (name == "main") {
                     entry_address = value & ~((decltype(value))1);
-                    break;
+                }
+                else if (name == "firmware") {
+                    *firmware_addr = value;
                 }
             }
         }
     }
+
+    if (entry_address == 0xffffffff)
+        throw std::runtime_error("Can't find entry function");
 
     uint32_t stack_pointer;
     emu.read_memory(0, (uint8_t*)&stack_pointer, 4);
@@ -117,7 +122,14 @@ int main(int argc, char** argv)
     };
 
     SecureBootExploitabilityModel model;
-    Emulator main_emulator = setup_simulator(argv[argc - 1]);
+    config.faulting_context.exploitability_model = &model;
+
+    u32 firmware_addr = 0xffffffff;
+    Emulator main_emulator = setup_simulator(argv[argc - 1], &firmware_addr);
+    if (firmware_addr == 0xffffffff)
+        throw std::runtime_error("Can't find firmware");
+    
+    std::cout << "Firmware is at address 0x" << std::hex << firmware_addr << std::dec << '\n'; 
 
     // test correctness:
     {
@@ -141,6 +153,31 @@ int main(int argc, char** argv)
             }
         }
         std::cout << "Positive test passed!" << std::endl;
+    }
+
+    /* simulate firmware get hacked */
+    u8 buf[4] = {0, 0, 0, 0};
+    main_emulator.write_memory(firmware_addr, buf, 4);
+
+    {
+        Emulator emu(main_emulator);
+
+        uint32_t test_mem;
+
+        emu.before_fetch_hook.add(check_completion, &test_mem);
+
+        auto ret = emu.emulate(1000000);
+        if (ret != ReturnCode::STOP_EMULATION_CALLED)
+        {
+            std::cout << "ERROR: " << ret << std::endl;
+            return 1;
+        }
+        if (test_mem != 0xdeadbeef)
+        {
+            std::cout << "ERROR: hacked firmware was executed" << std::endl;
+            return 1;
+        }
+        std::cout << "Negative test passed!" << std::endl;
     }
 
     config.faulting_context.emulation_timeout = compute_timeout(main_emulator);
