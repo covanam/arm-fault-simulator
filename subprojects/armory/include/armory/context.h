@@ -45,12 +45,6 @@ namespace armory
     struct Context
     {
         /*
-         * Defines addresses on which fault simulation is stopped.
-         * Use addresses where you want to check/know whether a fault was exploitable.
-         */
-        std::vector<u32> halting_points;
-
-        /*
          * The model is checked whenever an "end address" is hit.
          * If it returns FAULT_EXPLOITABLE, the fault is regarded as exploitable and the next iteration is tested.
          * If it returns NOT_EXPLOITABLE, the fault is regarded as not exploitable and the next iteration is tested.

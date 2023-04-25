@@ -84,18 +84,14 @@ static void check_completion(Emulator& emu, u32, u32, void* ptr) {
     }
 }
 
-static bool compute_timeout(const Emulator& main_emulator, u32 limit)
+static u32 compute_timeout(const Emulator& main_emulator)
 {
     Emulator timeout_emu(main_emulator);
 
     timeout_emu.before_fetch_hook.add(check_completion, nullptr);
+    timeout_emu.emulate(1000000);
 
-    if (timeout_emu.emulate(limit) == ReturnCode::MAX_INSTRUCTIONS_REACHED)
-    {
-        return false;
-    }
-
-    return true;
+    return 2 * timeout_emu.get_emulated_time();
 }
 
 int main(int argc, char** argv)
@@ -145,45 +141,9 @@ int main(int argc, char** argv)
             }
         }
         std::cout << "Positive test passed!" << std::endl;
-
-        return 0;
-
-        {
-            Emulator emu(main_emulator);
-
-            std::string executed;
-            emu.before_fetch_hook.add(check_completion, nullptr);
-
-            auto ret = emu.emulate(1000000);
-            if (ret != ReturnCode::STOP_EMULATION_CALLED)
-            {
-                std::cout << "ERROR: " << ret << std::endl;
-                return 1;
-            }
-            if (executed == "execute_firmware")
-            {
-                std::cout << "ERROR: incorrect firmware was executed" << std::endl;
-                return 1;
-            }
-        }
-        std::cout << "Negative test passed!" << std::endl;
     }
 
-    // auto-determine timeout
-    if (true)
-    {
-        u32 limit      = 1000000;
-        u32 grace_time = 1000;
-        if (!compute_timeout(main_emulator, limit))
-        {
-            std::cout << termcolor::bright_red << "ERROR:" << termcolor::reset << " execution without faults executes more than " << limit << " instructions." << std::endl;
-            std::cout << "Please provide a timeout via --timeout" << std::endl;
-            return -1;
-        }
-
-        std::cout << "no timeout set, simulation without any faults executes " << 132 << " instructions" << std::endl;
-        std::cout << "setting timeout to " << 111 << " instructions" << std::endl;
-    }
+    config.faulting_context.emulation_timeout = compute_timeout(main_emulator);
 
     std::cout << "simulation begin at " << main_emulator.get_time() << std::endl;
 

@@ -171,6 +171,12 @@ void FaultTracer::log_cpu_state(Emulator& emu, const Instruction& instruction, v
 
 void FaultTracer::detect_end_of_execution(Emulator& emu, u32 address, u32 instr_size, void* hook_context)
 {
+    (void)emu;
+    (void)address;
+    (void)instr_size;
+    (void)hook_context;
+    throw std::runtime_error("Should not reach here\n");
+/*
     UNUSED(instr_size);
     auto inst_ptr = (FaultTracer*)(hook_context);
     for (auto end_address : inst_ptr->m_ctx.halting_points)
@@ -193,6 +199,7 @@ void FaultTracer::detect_end_of_execution(Emulator& emu, u32 address, u32 instr_
             return;
         }
     }
+*/
 }
 
 void FaultTracer::handle_instruction_faults(Emulator& emu, u32 address, u32 instr_size, void* hook_context)

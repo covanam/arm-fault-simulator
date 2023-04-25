@@ -36,10 +36,6 @@ FaultSimulator::FaultSimulator(const Context& ctx)
     {
         throw std::runtime_error("no timeout specified");
     }
-    if (ctx.halting_points.empty())
-    {
-        throw std::runtime_error("no halting points specified");
-    }
 }
 
 void FaultSimulator::enable_progress_printing(bool enable)
@@ -69,9 +65,6 @@ std::vector<FaultCombination> FaultSimulator::simulate_faults(const Emulator& ma
         }
         return std::find(fault_models.begin(), fault_models.end(), a) < std::find(fault_models.begin(), fault_models.end(), b);
     });
-
-    // sort end addresses for binary search
-    std::sort(m_ctx.halting_points.begin(), m_ctx.halting_points.end());
 
     // precompute all instructions that may be faulted
     gather_faultable_instructions(main_emulator);
@@ -340,8 +333,8 @@ void FaultSimulator::detect_end_of_execution(Emulator& emu, u32 address, u32 ins
     UNUSED(instr_size);
     auto [inst_ptr, thread_ctx] = *((std::tuple<FaultSimulator*, ThreadContext*>*)user_data);
 
-    if (std::binary_search(inst_ptr->m_ctx.halting_points.begin(), inst_ptr->m_ctx.halting_points.end(), address))
-    {
+    /* every ~1000 instructions or when stopped */
+    if ((emu.is_running() && emu.get_time() % 1024 == 0) || !emu.is_running()) {
         if (thread_ctx->exploitability_model == nullptr)
         {
             thread_ctx->decision = ExploitabilityModel::Decision::EXPLOITABLE;
