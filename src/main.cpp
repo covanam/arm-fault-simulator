@@ -89,14 +89,14 @@ static void check_completion(Emulator& emu, u32, u32, void* ptr) {
     }
 }
 
-static u32 compute_timeout(const Emulator& main_emulator)
+static u32 get_execution_time(const Emulator& main_emulator)
 {
     Emulator timeout_emu(main_emulator);
 
     timeout_emu.before_fetch_hook.add(check_completion, nullptr);
     timeout_emu.emulate(1000000);
 
-    return 2 * timeout_emu.get_emulated_time();
+    return timeout_emu.get_emulated_time();
 }
 
 int main(int argc, char** argv)
@@ -180,7 +180,9 @@ int main(int argc, char** argv)
         std::cout << "Negative test passed!" << std::endl;
     }
 
-    config.faulting_context.emulation_timeout = compute_timeout(main_emulator);
+    u32 execution_time = get_execution_time(main_emulator);
+    config.faulting_context.emulation_timeout = 2 * execution_time;
+    std::cout << "Total execution time is " << execution_time << '\n';
 
     std::cout << "simulation begin at " << main_emulator.get_time() << std::endl;
 
