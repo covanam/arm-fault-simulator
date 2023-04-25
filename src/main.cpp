@@ -94,7 +94,7 @@ static u32 get_execution_time(const Emulator& main_emulator)
     Emulator timeout_emu(main_emulator);
 
     timeout_emu.before_fetch_hook.add(check_completion, nullptr);
-    timeout_emu.emulate(1000000);
+    timeout_emu.emulate(0xFFFFFFFF);
 
     return timeout_emu.get_emulated_time();
 }
@@ -133,6 +133,10 @@ int main(int argc, char** argv)
     
     std::cout << "Firmware is at address 0x" << std::hex << firmware_addr << std::dec << '\n'; 
 
+    u32 execution_time = get_execution_time(main_emulator);
+    config.faulting_context.emulation_timeout = 2 * execution_time;
+    std::cout << "Total execution time is " << execution_time << '\n';
+
     // test correctness:
     {
         {
@@ -142,7 +146,7 @@ int main(int argc, char** argv)
 
             emu.before_fetch_hook.add(check_completion, &test_mem);
 
-            auto ret = emu.emulate(1000000);
+            auto ret = emu.emulate(2 * execution_time);
             if (ret != ReturnCode::STOP_EMULATION_CALLED)
             {
                 std::cout << "ERROR: " << ret << std::endl;
@@ -168,7 +172,7 @@ int main(int argc, char** argv)
 
         emu.before_fetch_hook.add(check_completion, &test_mem);
 
-        auto ret = emu.emulate(1000000);
+        auto ret = emu.emulate(2 * execution_time);
         if (ret != ReturnCode::STOP_EMULATION_CALLED)
         {
             std::cout << "ERROR: " << ret << std::endl;
@@ -181,10 +185,6 @@ int main(int argc, char** argv)
         }
         std::cout << "Negative test passed!" << std::endl;
     }
-
-    u32 execution_time = get_execution_time(main_emulator);
-    config.faulting_context.emulation_timeout = 2 * execution_time;
-    std::cout << "Total execution time is " << execution_time << '\n';
 
     std::cout << "simulation begin at " << main_emulator.get_time() << std::endl;
 
