@@ -1156,7 +1156,7 @@ bool Emulator::execute(const Instruction& instr)
                 increment_pc = false;
             }
 
-            if (instr.flags.wback && _1BIT(instr.imm > instr.Rn) != 0)
+            if (instr.flags.wback && _1BIT(instr.imm >> instr.Rn) == 0)
             {
                 write_register_internal(instr.Rn, end_val);
             }
