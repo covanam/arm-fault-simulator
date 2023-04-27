@@ -5,6 +5,9 @@ Path("reports").mkdir(exist_ok=True)
 Path("reports/gcc_o2").mkdir(exist_ok=True)
 Path("reports/gcc_o3").mkdir(exist_ok=True)
 Path("reports/gcc_os").mkdir(exist_ok=True)
+Path("reports/clang_o2").mkdir(exist_ok=True)
+Path("reports/clang_o3").mkdir(exist_ok=True)
+Path("reports/clang_os").mkdir(exist_ok=True)
 
 for dir in os.listdir("files"):
     for f in os.listdir(os.path.join("files", dir)):
