@@ -11,7 +11,7 @@
 
 using namespace armory;
 
-static Emulator setup_simulator(const std::string& elf_file, u32 *firmware_addr) {
+static Emulator setup_simulator(const std::string& elf_file, u32 *firmware_addr, u32 *end_addr) {
     Emulator emu(mulator::ARMv7M);
     emu.set_flash_region(0, 0x40000);
     emu.set_ram_region(0x20000000, 0x10000);
@@ -56,6 +56,9 @@ static Emulator setup_simulator(const std::string& elf_file, u32 *firmware_addr)
                 else if (name == "firmware") {
                     *firmware_addr = value;
                 }
+                else if (name == "bootloader_completed") {
+                    *end_addr = value & ~((decltype(value))1);
+                }
             }
         }
     }
@@ -68,7 +71,7 @@ static Emulator setup_simulator(const std::string& elf_file, u32 *firmware_addr)
 
     emu.write_register(Register::SP, stack_pointer);
     emu.write_register(Register::PC, entry_address);
-    emu.write_register(Register::LR, 0xFFFFFFFF);
+    emu.write_register(Register::LR, *end_addr | 1);
 
     uint32_t test_mem = 0xffffffff;
     emu.write_memory(0x20008000, (uint8_t*)&test_mem, 4);
@@ -76,24 +79,10 @@ static Emulator setup_simulator(const std::string& elf_file, u32 *firmware_addr)
     return emu;
 }
 
-static void check_completion(Emulator& emu, u32, u32, void* ptr) {
-    uint32_t test_mem;
-    emu.read_memory(0x20008000, (uint8_t*)&test_mem, 4);
-    if (test_mem != 0xffffffff) {
-        emu.stop_emulation();
-
-        if (ptr != nullptr) {
-            uint32_t *ptr_test_mem = static_cast<uint32_t*>(ptr);
-            *ptr_test_mem = test_mem;
-        }
-    }
-}
-
 static u32 get_execution_time(const Emulator& main_emulator)
 {
     Emulator timeout_emu(main_emulator);
 
-    timeout_emu.before_fetch_hook.add(check_completion, nullptr);
     timeout_emu.emulate(0xFFFFFFFF);
 
     return timeout_emu.get_emulated_time();
@@ -105,33 +94,43 @@ int main(int argc, char** argv)
 
     struct SecureBootExploitabilityModel : ExploitabilityModel
     {
+        u32 end_address;
+        SecureBootExploitabilityModel(u32 end_address) {
+            this->end_address = end_address;
+        }
+
         std::unique_ptr<ExploitabilityModel> clone() override
         {
             return std::make_unique<SecureBootExploitabilityModel>(*this);
         }
 
-        Decision evaluate(const Emulator& emu, const Context&, u32) override
+        Decision evaluate(const Emulator& emu, const Context&, u32 addr) override
         {
+            if (addr != end_address)
+                return Decision::CONTINUE_SIMULATION;
+
             uint32_t test_mem;
             emu.read_memory(0x20008000, (uint8_t*)&test_mem, 4);
             if (test_mem == 0xcafebabe)
                 return Decision::EXPLOITABLE;
-            else if (test_mem == 0xffffffff)
-                return Decision::CONTINUE_SIMULATION;
             else
                 return Decision::NOT_EXPLOITABLE;
         };
     };
 
-    SecureBootExploitabilityModel model;
-    config.faulting_context.exploitability_model = &model;
-
     u32 firmware_addr = 0xffffffff;
-    Emulator main_emulator = setup_simulator(argv[argc - 1], &firmware_addr);
+    u32 end_addr = 0xffffffff;
+    Emulator main_emulator = setup_simulator(argv[argc - 1], &firmware_addr, &end_addr);
     if (firmware_addr == 0xffffffff)
         throw std::runtime_error("Can't find firmware");
+    if (end_addr == 0xffffffff)
+        throw std::runtime_error("Can't find end address");
+
+    SecureBootExploitabilityModel model(end_addr);
+    config.faulting_context.exploitability_model = &model;
     
     std::cout << "Firmware is at address 0x" << std::hex << firmware_addr << std::dec << '\n'; 
+    std::cout << "Bootloader completion is at address 0x" << std::hex << end_addr << std::dec << '\n';
 
     u32 execution_time = get_execution_time(main_emulator);
     config.faulting_context.emulation_timeout = 2 * execution_time;
@@ -144,14 +143,9 @@ int main(int argc, char** argv)
 
             uint32_t test_mem;
 
-            emu.before_fetch_hook.add(check_completion, &test_mem);
+            emu.emulate(2 * execution_time);
 
-            auto ret = emu.emulate(2 * execution_time);
-            if (ret != ReturnCode::STOP_EMULATION_CALLED)
-            {
-                std::cout << "ERROR: " << ret << std::endl;
-                return 1;
-            }
+            emu.read_memory(0x20008000, (uint8_t*)&test_mem, 4);
             if (test_mem != 0xcafebabe)
             {
                 std::cout << "ERROR: correct firmware was not executed" << std::endl;
@@ -170,14 +164,9 @@ int main(int argc, char** argv)
 
         uint32_t test_mem;
 
-        emu.before_fetch_hook.add(check_completion, &test_mem);
+        emu.emulate(2 * execution_time);
 
-        auto ret = emu.emulate(2 * execution_time);
-        if (ret != ReturnCode::STOP_EMULATION_CALLED)
-        {
-            std::cout << "ERROR: " << ret << std::endl;
-            return 1;
-        }
+        emu.read_memory(0x20008000, (uint8_t*)&test_mem, 4);
         if (test_mem != 0xdeadbeef)
         {
             std::cout << "ERROR: hacked firmware was executed" << std::endl;
